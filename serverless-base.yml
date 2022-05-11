@@ -1,0 +1,316 @@
+service: ini-ride-base
+configValidationMode: error
+frameworkVersion: '3'
+
+plugins:
+  - serverless-export-env
+  - serverless-stack-output
+
+custom:
+  accountId: 846727667520
+  output:
+    handler: scripts/output-base.handler
+    file: env-base.toml
+  export-env:
+    filename: .env-base
+    overwrite: true
+    enableOffline: true
+  
+provider:
+  name: aws
+  region: eu-west-1
+  stage: dev
+  endpointType: regional
+  runtime: nodejs14.x
+  environment:
+    REGION: ${self:provider.region}
+    STAGE: ${self:provider.stage}
+    DB_TABLE: ${self:service}-${opt:stage, self:provider.stage}-users
+    DB_TABLE_RIDES: ${self:service}-${opt:stage, self:provider.stage}-rides
+    DB_TABLE_LOCATION: ${self:service}-${opt:stage, self:provider.stage}-location
+    USER_POOL: ${self:service}-${opt:stage, self:provider.stage}
+    USER_POOL_CLIENT: ${self:service}-${opt:stage, self:provider.stage}
+    USER_POOL_APPLICATION_CLIENT: ${self:service}-${opt:stage, self:provider.stage}
+    USER_POOL_RESOURCE_SERVER: ${self:service}-${opt:stage, self:provider.stage}
+
+functions:
+  cognitoPreSignup:
+    handler: api/common/CognitoPreSignupTrigger.handler
+    description: pre sign-up trigger to auto confirm the email verification
+    events:
+      - cognitoUserPool:
+          pool: IniRide
+          trigger: PreSignUp
+
+package:
+  patterns:
+    - '!node_modules/**'
+    - '!package-lock.json'
+
+resources:
+  Outputs:
+    UserPoolId:
+      Value:
+        Ref: CognitoUserPoolIniRide 
+    UserPoolClientId:
+      Value:
+        Ref: CognitoUserPoolClient
+    UserPoolApplicationClientId:
+      Value:
+        Ref: CognitoUserPoolApplicationClient
+    UserPoolResourceServerId:
+      Value:
+        Ref: CognitoUserPoolResourceServer
+    UserPoolDomainId:
+      Value:
+        Ref: CognitoUserPoolDomain
+
+  Resources:
+    CognitoUserPoolIniRide:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:provider.environment.USER_POOL}
+        Schema:
+          - Name: role
+            Mutable: true
+            Required: false
+            AttributeDataType: String
+            StringAttributeConstraints:
+              MinLength: 4
+              MaxLength: 256
+          - Name: home
+            Required: false
+            Mutable: true
+            AttributeDataType: String
+            StringAttributeConstraints:
+              MinLength: 3
+              MaxLength: 256
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+            RequireUppercase: true
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        # Generate an app client name based on the stage
+        ClientName: ${self:provider.environment.USER_POOL_CLIENT}
+        UserPoolId:
+          Ref: CognitoUserPoolIniRide
+        WriteAttributes:
+          - custom:role
+          - custom:home
+          - email
+        GenerateSecret: false
+        ExplicitAuthFlows:
+          - ALLOW_ADMIN_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+
+    CognitoUserPoolResourceServer:
+      Type: AWS::Cognito::UserPoolResourceServer
+      Properties:
+        Identifier: "users"
+        Name: ${self:provider.environment.USER_POOL_RESOURCE_SERVER}
+        Scopes:
+          - ScopeName: "post"
+            ScopeDescription: "post_user"
+          - ScopeName: "authenticate"
+            ScopeDescription: "authenticate_user"
+        UserPoolId:
+          Ref: CognitoUserPoolIniRide
+
+    CognitoUserPoolApplicationClient:
+      Type: AWS::Cognito::UserPoolClient
+      DependsOn: CognitoUserPoolResourceServer
+      Properties:
+        # Generate an app client name based on the stage
+        ClientName: ${self:provider.environment.USER_POOL_APPLICATION_CLIENT}
+        UserPoolId:
+          Ref: CognitoUserPoolIniRide
+        GenerateSecret: true
+        AllowedOAuthFlows:
+          - client_credentials
+        AllowedOAuthFlowsUserPoolClient: true
+        AllowedOAuthScopes:
+          - users/post
+
+    CognitoUserPoolDomain:
+      Type: AWS::Cognito::UserPoolDomain
+      Properties:
+        UserPoolId:
+          Ref: CognitoUserPoolIniRide
+        Domain:  ${self:service}-${opt:stage, self:provider.stage}
+
+    UserPoolLambdaInvokePermission:
+      Type: AWS::Lambda::Permission
+      DependsOn: CognitoPreSignupLambdaFunction
+      Properties:
+        Action: lambda:invokeFunction
+        Principal: cognito-idp.amazonaws.com
+        FunctionName: arn:aws:lambda:${self:provider.region}:${self:custom.accountId}:function:${self:service}-${opt:stage, self:provider.stage}-cognitoPreSignup
+        SourceArn: arn:aws:cognito-idp:${self:provider.region}:${self:custom.accountId}:userpool/*
+
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DB_TABLE}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: gsi1pk
+            AttributeType: S
+          - AttributeName: gsi1sk
+            AttributeType: S
+          - AttributeName: gsi2pk
+            AttributeType: S
+          - AttributeName: gsi2sk
+            AttributeType: S
+          - AttributeName: gsi3pk
+            AttributeType: S
+          - AttributeName: gsi3sk
+            AttributeType: S
+
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-1-index
+            KeySchema:
+              - AttributeName: gsi1pk
+                KeyType: HASH
+              - AttributeName: gsi1sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-2-index
+            KeySchema:
+              - AttributeName: gsi2pk
+                KeyType: HASH
+              - AttributeName: gsi2sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-3-index
+            KeySchema:
+              - AttributeName: gsi3pk
+                KeyType: HASH
+              - AttributeName: gsi3sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    RidesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DB_TABLE_RIDES}
+        AttributeDefinitions:
+          - AttributeName: hashKey
+            AttributeType: N
+          - AttributeName: rangeKey
+            AttributeType: S
+          - AttributeName: geohash
+            AttributeType: N
+          - AttributeName: gsi2pk
+            AttributeType: S
+          - AttributeName: gsi2sk
+            AttributeType: S
+          - AttributeName: gsi3pk
+            AttributeType: S
+          - AttributeName: gsi3sk
+            AttributeType: S
+
+        KeySchema:
+          - AttributeName: hashKey
+            KeyType: HASH
+          - AttributeName: rangeKey
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: geohash-index
+            KeySchema:
+              - AttributeName: hashKey
+                KeyType: HASH
+              - AttributeName: geohash
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-2-index
+            KeySchema:
+              - AttributeName: gsi2pk
+                KeyType: HASH
+              - AttributeName: gsi2sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-3-index
+            KeySchema:
+              - AttributeName: gsi3pk
+                KeyType: HASH
+              - AttributeName: gsi3sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    LocationTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DB_TABLE_LOCATION}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: gsi1pk
+            AttributeType: S
+          - AttributeName: gsi1sk
+            AttributeType: S
+          - AttributeName: gsi2pk
+            AttributeType: S
+          - AttributeName: gsi2sk
+            AttributeType: S
+          - AttributeName: gsi3pk
+            AttributeType: S
+          - AttributeName: gsi3sk
+            AttributeType: S
+
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-1-index
+            KeySchema:
+              - AttributeName: gsi1pk
+                KeyType: HASH
+              - AttributeName: gsi1sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-2-index
+            KeySchema:
+              - AttributeName: gsi2pk
+                KeyType: HASH
+              - AttributeName: gsi2sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-3-index
+            KeySchema:
+              - AttributeName: gsi3pk
+                KeyType: HASH
+              - AttributeName: gsi3sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+              

@@ -1,0 +1,283 @@
+service: ini-ride
+frameworkVersion: '3'
+configValidationMode: error
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
+  - serverless-export-env
+  - serverless-stack-output
+
+useDotenv: true
+
+custom:
+  accountId: 846727667520
+  allowedHeaders:
+    - Accept
+    - Content-Type
+    - Content-Length
+    - Authorization
+    - X-Amz-Date
+    - X-Api-Key
+    - X-Amz-Security-Token
+    - X-Amz-User-Agent
+    - app_user_id
+    - app_user_name
+  serverless-offline:
+    ignoreJWTSignature: true
+  output:
+    handler: scripts/output.handler
+    file: env.toml
+  export-env:
+    filename: .env
+    overwrite: true
+    enableOffline: true  
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: eu-west-1
+  stage: dev      
+  memorySize: 128
+  timeout: 5
+  endpointType: regional
+  logs:
+    restApi:
+      accessLogging: true
+      executionLogging: true
+    httpApi: true
+  environment:
+    DB_TABLE: ${env:DB_TABLE}
+    DB_TABLE_RIDES: ${env:DB_TABLE_RIDES}
+    DB_TABLE_LOCATION: ${env:DB_TABLE_LOCATION}
+    USER_POOL: ${env:USER_POOL}
+    USER_POOL_ID: ${env:USER_POOL_ID}
+    USER_POOL_ARN: arn:aws:cognito-idp:${self:provider.region}:${self:custom.accountId}:userpool/${env:USER_POOL_ID}
+    USER_POOL_URL: https://cognito-idp.${self:provider.region}.amazonaws.com/${env:USER_POOL_ID}
+    USER_POOL_CLIENT: ${self:service}-${opt:stage, self:provider.stage}
+    USER_POOL_CLIENT_ID: ${env:USER_POOL_CLIENT_ID}
+    USER_POOL_APPLICATION_CLIENT_ID: ${env:USER_POOL_APPLICATION_CLIENT_ID}
+    USER_POOL_APPLICATION_CLIENT_SECRET: ${env:USER_POOL_APPLICATION_CLIENT_SECRET}
+    REGION: ${self:provider.region}
+    USER_POOL_ROOT_USER: "vinoselv"
+    USER_POOL_ROOT_USER_PASSWORD: "p@ssw0rD"
+    LOG_LEVEL: "debug"
+    DEFAULT_FUNCTION_TIMEOUT: 10
+    HTTP_API_URL: 
+      'Fn::ImportValue': '${self:service}-${opt:stage, self:provider.stage}-http-endpoint'
+    IOT_CORE_ENDPOINT: 'a12ucxj1zaaa1x-ats.iot.eu-west-1.amazonaws.com'  
+
+  iam:
+    role:
+      name:  ${self:service}-${opt:stage, self:provider.stage}-iam-role
+      statements:
+        - Effect: "Allow"
+          Action:
+            - iot:publish
+          Resource:
+            - arn:aws:iot:${self:provider.region}:${self:custom.accountId}:topic/*  
+        - Effect: "Allow"
+          Action:
+            - cognito-identity:*
+            - cognito-sync:*
+            - cognito-idp:*
+            - iam:ListRoles,
+            - iam:ListOpenIdConnectProviders,
+            - sns:ListPlatformApplications
+          Resource:
+            - ${self:provider.environment.USER_POOL_ARN}
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:BatchGetItem
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${env:DB_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${env:DB_TABLE}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${env:DB_TABLE_RIDES}
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${env:DB_TABLE_RIDES}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${env:DB_TABLE_LOCATION}
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${env:DB_TABLE_LOCATION}/index/*
+  httpApi:
+    cors: true
+    authorizers:
+      serviceAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${self:provider.environment.USER_POOL_URL}
+        audience:
+          - ${self:provider.environment.USER_POOL_CLIENT_ID}
+          - ${self:provider.environment.USER_POOL_APPLICATION_CLIENT_ID}
+
+functions:
+  create-user:
+    handler: api/user/CreateUser.handler
+    description: POST /user
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /user
+          method: post
+          authorizer: serviceAuthorizer
+
+  authenticate-user:
+    handler: api/user/AuthenticateUser.handler
+    description: POST /user/authenticate
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /user/authenticate
+          method: post
+          authorizer: serviceAuthorizer
+
+  get-user:
+    handler: api/user/GetUser.handler
+    description: GET /user
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /user
+          method: get
+          authorizer: serviceAuthorizer
+
+  delete-user:
+    handler: api/user/DeleteUser.handler
+    description: DELETE /user/{user_id}
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /user/{user_id}
+          method: delete
+          authorizer: serviceAuthorizer
+
+  create-ride-offer:
+    handler: api/ride/CreateRideOffer.handler
+    description: POST /ride-offer
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /ride-offer
+          method: post
+          authorizer: serviceAuthorizer   
+
+  create-ride-request:
+    handler: api/ride/CreateRideRequest.handler
+    description: POST /ride/{ride_id}/request
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /rides/{ride_id}/request
+          method: post
+          authorizer: serviceAuthorizer           
+
+  get-rides:
+    handler: api/ride/GetRides.handler
+    description: GET /rides
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /rides
+          method: get
+          authorizer: serviceAuthorizer
+
+  get-ride:
+    handler: api/ride/GetRide.handler
+    description: GET /rides/{ride_id}
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /rides/{ride_id}
+          method: get
+          authorizer: serviceAuthorizer  
+
+  delete-ride:
+    handler: api/ride/DeleteRide.handler
+    description: DELETE /ride/{ride_id}
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /rides/{ride_id}
+          method: delete
+          authorizer: serviceAuthorizer               
+
+  search-rides:
+    handler: api/ride/SearchRides.handler
+    description: POST /search-rides
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /search-rides
+          method: post
+          authorizer: serviceAuthorizer 
+
+  update-ride-status:
+    handler: api/ride/UpdateRideStatus.handler
+    description: POST /ride-status
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /ride-status
+          method: post
+          authorizer: serviceAuthorizer 
+
+  create-car-request:
+    handler: api/car/CreateCar.handler
+    description: POST /car
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /car
+          method: post
+          authorizer: serviceAuthorizer    
+
+  update-car-request:
+    handler: api/car/UpdateCar.handler
+    description: PATCH /car
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /car
+          method: patch
+          authorizer: serviceAuthorizer        
+
+  get-car:
+    handler: api/car/GetCar.handler
+    description: GET /car
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /car
+          method: get
+          authorizer: serviceAuthorizer   
+
+  delete-car:
+    handler: api/car/DeleteCar.handler
+    description: DELETE /car
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}
+    events:
+      - httpApi:
+          path: /car
+          method: delete
+          authorizer: serviceAuthorizer    
+
+  mqtt-bridge:
+    handler: api/mqtt/MqttBridge.handler
+    description: MQTT bridge to route events to another topic
+    timeout: ${self:provider.environment.DEFAULT_FUNCTION_TIMEOUT}                                            
+
+package:
+  patterns:
+    - '!package-lock.json'
+
+resources:
+  Outputs:
+    HttpApiUrl:
+      Export:
+        Name: ${self:service}-${opt:stage, self:provider.stage}-http-endpoint

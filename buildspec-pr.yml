@@ -1,0 +1,41 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 12.x
+    commands:
+      - echo Installing dependencies...
+      - npm install -g npm
+      - npm install -g serverless
+  pre_build:
+    commands:
+      - npm install
+      - echo preapring the base environment...
+      - ./scripts/generate-base-env.sh
+  build:
+    commands:
+      - echo preapring the base environment...
+      - sls export-env
+  post_build:
+    commands:
+      - test "$CODEBUILD_BUILD_SUCCEEDING" = "1"
+      - echo Running the tests
+      - sls export-env
+      - npm run integration
+
+cache:
+  paths:
+    - node_modules
+
+reports:
+  jest_reports:
+    files:
+      - jest-junit.xml
+    file-format: JUNITXML
+    base-directory: test_reports
+  cobertura-report:
+    files:
+      - cobertura-coverage.xml
+    file-format: COBERTURAXML
+    base-directory: test_reports

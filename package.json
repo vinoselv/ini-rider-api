@@ -1,0 +1,60 @@
+{
+  "name": "sls-notes-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "acceptance": "jest __tests__/acceptance/* --verbose=false --no-cache",
+    "integration": "jest __tests__/integration/* --verbose=false --coverage --no-cache"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/preset-env": "^7.16.11",
+    "@babel/preset-typescript": "^7.16.7",
+    "@types/jest": "^27.4.1",
+    "aws-sdk": "^2.1101.0",
+    "btoa": "^1.2.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.13.2",
+    "dynamodb-geo": "^0.4.0",
+    "jest": "^27.5.1",
+    "jest-environment-node": "^27.5.1",
+    "jest-junit": "^13.0.0",
+    "jwt-decode": "^3.1.2",
+    "ksuid": "^3.0.0",
+    "lodash": "^4.17.21",
+    "log4js": "^6.4.3",
+    "moment": "^2.29.1",
+    "nanoid": "^3.3.1",
+    "reflect-metadata": "^0.1.13",
+    "snake-case": "^3.0.4",
+    "uuid": "^8.3.2",
+    "axios": "0.27.2"
+  },
+  "devDependencies": {
+    "@shelf/jest-dynamodb": "^2.2.3",
+    "@types/aws-lambda": "^8.10.93",
+    "@types/node": "^17.0.21",
+    "atob": "^2.1.2",
+    "jest-circus": "^27.5.1",
+    "jsonwebtoken": "^8.5.1",
+    "jwk-to-pem": "^2.0.5",
+    "prettier": "2.6.0",
+    "request": "^2.88.2",
+    "serverless": "^3.15.0",
+    "serverless-domain-manager": "^6.0.2",
+    "serverless-export-env": "github:arabold/serverless-export-env",
+    "serverless-offline": "^8.7.0",
+    "serverless-plugin-typescript": "^2.1.2",
+    "serverless-stack-output": "^0.2.3",
+    "supertest": "^6.2.2",
+    "ts-jest": "^27.1.4",
+    "typescript": "^4.6.3"
+  },
+  "prettier": {
+    "useTabs": false,
+    "tabWidth": 4
+  }
+}
