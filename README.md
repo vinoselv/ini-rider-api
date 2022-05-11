@@ -40,6 +40,6 @@ Please refer the specific sections formore details:
 - The application test coverage is very limited (only to users endpoint) due to the time limitations.
 - The code can be still optimised / improved to fix the performance and reliablity issues.
 
-**Attribution**
+**Thanks**
 
-Thanks to *Saravanan Dhanabal*, *Indhira Piriyadharshini Marimuthu* for your support in this project.
+Thanks to *Saravanan Dhanabal*, *Indhira Piriyadharshini Marimuthu* for your support during the project.
