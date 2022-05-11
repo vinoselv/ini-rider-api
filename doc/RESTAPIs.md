@@ -38,7 +38,7 @@ POST
 *AWS Cognito Endpooint*/oauth2/token
 
 Authorization:  
-We must pass the client_id and client_secret in the authorization header through Basic HTTP authorization. The authorization header string is Basic Base64Encode(client_id:client_secret). You must use the *USER_POOL_CLIENT_ID* and *USER_POOL_APPLICATION_CLIENT_SECRET* included in the .env.{stage} file generated during the deployment here. 
+We must pass the client_id and client_secret in the authorization header through Basic HTTP authorization. The authorization header string is Basic Base64Encode(client_id:client_secret). You must use the *USER_POOL_CLIENT_ID* and *USER_POOL_APPLICATION_CLIENT_SECRET* included in the .env.{stage} file generated during the deployment. 
 
 Content-Type:  
 Must always be 'application/x-www-form-urlencoded'.
