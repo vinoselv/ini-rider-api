@@ -43,6 +43,10 @@ $ aws iam get-user
 }
 ```
 
+**Replace the Google Maps API Key**
+Replace the Google Maps API Key before you start building the project in the file [AWSUtils](../api/common/AWSUtils.ts#62) Line no.62.
+
+
 ## Deployment
 
 The [serverless framework](https://www.serverless.com/) is used to deploy and manage the AWS resources. The serverless base stack which manages Dynamodb and Cognito is defined in the serverless-base.yml. The serverless stack which manages the Lambda functions is defined in the serverless.yml.

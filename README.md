@@ -34,3 +34,12 @@ Please refer the specific sections formore details:
 - [Location Tracking](doc/LocationTracking.md)
 - [Nordic Thingy:91](doc/Thingy91Setup.md)
 - [REST APIs](doc/RESTAPIs.md)
+
+
+**Limitations**
+- The application test coverage is very limited (only to users endpoint) due to the time limitations.
+- The code can be still optimised / improved to fix the performance and reliablity issues.
+
+**Attribution**
+
+Thanks to *Saravanan Dhanabal*, *Indhira Piriyadharshini Marimuthu* for your support in this project.
